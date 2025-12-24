@@ -29,7 +29,7 @@ var (
 
 func init() {
 	store, _ = storage.NewSQLStorage("postgres://keeper:secret@localhost:5432/keepermd?sslmode=disable")
-	au = auth.NewAuth()
+	au = auth.NewAuth("test_key")
 	um := usermanager.NewUserManager(store, au)
 	dm := datamanager.NewDataManager(store)
 	serverHandler = handler.NewServerHandler(um, dm)

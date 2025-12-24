@@ -40,7 +40,7 @@ func NewKeeperServer(config *KeeperServerConfig) (*KeeperServer, error) {
 
 	newServer := &KeeperServer{}
 
-	au := auth.NewAuth()
+	au := auth.NewAuth(config.SignKey)
 
 	store, err := storage.NewSQLStorage(config.DBAddress)
 	if err != nil {

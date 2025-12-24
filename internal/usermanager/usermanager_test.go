@@ -47,7 +47,7 @@ func TestUserManager_UserRegister(t *testing.T) {
 		},
 	}
 
-	auth := auth.NewAuth()
+	auth := auth.NewAuth("test_key")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	m := mocks.NewMockUserStorageInterface(ctrl)
@@ -131,7 +131,7 @@ func TestUserManager_UserAuth(t *testing.T) {
 		},
 	}
 
-	auth := auth.NewAuth()
+	auth := auth.NewAuth("test_key")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	m := mocks.NewMockUserStorageInterface(ctrl)

@@ -23,8 +23,8 @@ type jwtConfig struct {
 	key []byte
 }
 
-func NewAuth() *Auth {
-	newConfig := jwtConfig{alg: "HS256", key: []byte("secret")}
+func NewAuth(signkey string) *Auth {
+	newConfig := jwtConfig{alg: "HS256", key: []byte(signkey)}
 	baseToken := jwtauth.New(newConfig.alg, newConfig.key, nil)
 	return &Auth{config: &newConfig, baseTokenAuth: baseToken}
 }
