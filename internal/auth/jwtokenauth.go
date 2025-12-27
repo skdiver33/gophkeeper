@@ -1,0 +1,68 @@
+package auth
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strconv"
+	"time"
+
+	"github.com/go-chi/jwtauth/v5"
+)
+
+type Auth struct {
+	config        *jwtConfig
+	baseTokenAuth *jwtauth.JWTAuth
+}
+
+type jwtConfig struct {
+	alg string
+	key []byte
+}
+
+func NewAuth(signkey string) *Auth {
+	newConfig := jwtConfig{alg: "HS256", key: []byte(signkey)}
+	baseToken := jwtauth.New(newConfig.alg, newConfig.key, nil)
+	return &Auth{config: &newConfig, baseTokenAuth: baseToken}
+}
+
+func (auth *Auth) GetBaseToken() *jwtauth.JWTAuth {
+	return auth.baseTokenAuth
+}
+
+func (auth *Auth) CreateUserToken(userID int) (string, error) {
+	_, tokenString, err := auth.baseTokenAuth.Encode(map[string]interface{}{"user_id": strconv.Itoa(userID), "exp": time.Now().Add(2 * time.Hour)})
+	if err != nil {
+		return "", fmt.Errorf("error create user token. %w", err)
+	}
+	return tokenString, nil
+}
+
+func GetUserIDFromClaims(ctx context.Context) (int, error) {
+	_, claims, _ := jwtauth.FromContext(ctx)
+	userIDValue, ok := claims["user_id"]
+	if !ok {
+		slog.Error("find user_id in claims", "claims", claims)
+		return -1, errors.New("userID not found in JWT claims")
+
+	}
+	userIDStr, ok := userIDValue.(string)
+	if !ok {
+		return -1, errors.New("userID in JWT claims is not string")
+	}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		return -1, errors.New("error convert user id from string to int")
+	}
+	return userID, nil
+}
+
+func GetPasswdHash(pass string) string {
+	h := sha256.New()
+	h.Write([]byte(pass))
+	dst := h.Sum(nil)
+	return base64.RawStdEncoding.EncodeToString(dst)
+}
