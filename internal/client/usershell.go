@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -26,6 +27,11 @@ func (client *KeeperClient) RunUserShell(ctx context.Context) {
 				slog.Warn("run select prompt", "error", err.Error())
 				return
 			}
+			if index > 1 && client.JWT == "" {
+				slog.Info("Please login in keeper")
+				continue
+			}
+
 			switch index {
 			case 0:
 				err := client.AddUser()
@@ -45,10 +51,6 @@ func (client *KeeperClient) RunUserShell(ctx context.Context) {
 				}
 				slog.Info("user successful auth")
 			case 2:
-				if client.JWT == "" {
-					slog.Info("Please login in keeper")
-					continue
-				}
 				err := client.SaveData()
 				if err != nil {
 					fmt.Println("save data error")
@@ -56,10 +58,6 @@ func (client *KeeperClient) RunUserShell(ctx context.Context) {
 					continue
 				}
 			case 3:
-				if client.JWT == "" {
-					slog.Info("Please login in keeper")
-					continue
-				}
 				err := client.ListDataOnServer()
 				if err != nil {
 					fmt.Println("list data error")
@@ -67,10 +65,6 @@ func (client *KeeperClient) RunUserShell(ctx context.Context) {
 					continue
 				}
 			case 4:
-				if client.JWT == "" {
-					slog.Info("Please login in keeper")
-					continue
-				}
 				err := client.ReadDataFromServer()
 				if err != nil {
 					fmt.Println("error read data from server")
@@ -78,10 +72,6 @@ func (client *KeeperClient) RunUserShell(ctx context.Context) {
 					continue
 				}
 			case 5:
-				if client.JWT == "" {
-					slog.Info("Please login in keeper")
-					continue
-				}
 				err := client.DeleteDataFromServer()
 				if err != nil {
 					fmt.Println("error delete data from server")
@@ -100,6 +90,10 @@ func (client *KeeperClient) ListDataOnServer() error {
 	data, err := client.GetAllData()
 	client.UserData = data
 	if err != nil {
+		if errors.Is(err, KeeperClientErrDataNotFound) {
+			fmt.Println("Data on server not found")
+			return nil
+		}
 		return fmt.Errorf("err get data for user: %w", err)
 	}
 	for _, md := range *client.UserData {

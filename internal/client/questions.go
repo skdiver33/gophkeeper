@@ -55,12 +55,13 @@ var bankCardQuest = []*survey.Question{
 
 var fileQuest = []*survey.Question{
 	{
-		Name:      "Filename",
-		Prompt:    &survey.Input{Message: "Enter full filename (name + full path to file)"},
-		Validate:  survey.Required,
-		Transform: survey.ToLower,
+		Name:     "Filename",
+		Prompt:   &survey.Input{Message: "Enter full filename (name + full path to file)"},
+		Validate: survey.Required,
 	},
 }
+
+var dataQuest = [][]*survey.Question{authDataQuest, bankCardQuest, fileQuest}
 
 var descQuest = []*survey.Question{
 	{

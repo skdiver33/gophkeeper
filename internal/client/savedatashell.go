@@ -3,13 +3,38 @@ package client
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/manifoldco/promptui"
 	"github.com/skdiver33/gophkeeper/model"
 	"github.com/skdiver33/gophkeeper/protocol"
 )
+
+type BynaryConverter interface {
+	ToBinary() ([]byte, error)
+}
+
+func GetProtocolPackage[K BynaryConverter](i int) (*protocol.ProtocolPackage, error) {
+
+	var data K
+	err := survey.Ask(dataQuest[i], &data)
+	if err != nil {
+		return nil, err
+	}
+	desc, err := GetDataDescription()
+	if err != nil {
+		return nil, err
+	}
+	sendData, err := data.ToBinary()
+	if err != nil {
+		return nil, err
+	}
+	pkg, err := protocol.CreateProtoPackage(sendData, model.DataTypes(i), *desc)
+	if err != nil {
+		return nil, err
+	}
+	return pkg, nil
+}
 
 func (client *KeeperClient) SaveData() error {
 	prompt := promptui.Select{
@@ -20,101 +45,32 @@ func (client *KeeperClient) SaveData() error {
 	if err != nil {
 		return err
 	}
+	var pkg *protocol.ProtocolPackage
 	switch index {
 	case 0:
-		ad := model.AuthData{}
-		err := survey.Ask(authDataQuest, &ad)
-		if err != nil {
-			return err
-		}
-		desc, err := client.GetDataDescription()
-		if err != nil {
-			return err
-		}
-		sendData, err := ad.ToBinary()
-		if err != nil {
-			return err
-		}
-		pkg, err := protocol.CreateProtoPackage(sendData, model.AuthDataType, *desc)
-		if err != nil {
-			return err
-		}
-
-		err = pkg.CryptPkgData(client.CryptKey)
-		if err != nil {
-			return err
-		}
-
-		err = client.SendData(pkg)
-		if err != nil {
-			return err
-		}
-		fmt.Println("user authentification data successfull save")
+		pkg, err = GetProtocolPackage[model.AuthData](index)
 	case 1:
-		bankData := model.BankCardData{}
-		err := survey.Ask(bankCardQuest, &bankData)
-		if err != nil {
-			return err
-		}
-		desc, err := client.GetDataDescription()
-		if err != nil {
-			return err
-		}
-		fmt.Println(bankData)
-		sendData, err := bankData.ToBinary()
-		if err != nil {
-			return err
-		}
-		pkg, err := protocol.CreateProtoPackage(sendData, model.BankCardType, *desc)
-		if err != nil {
-			return err
-		}
-
-		err = pkg.CryptPkgData(client.CryptKey)
-		if err != nil {
-			return err
-		}
-
-		err = client.SendData(pkg)
-		if err != nil {
-			return err
-		}
-		fmt.Println("bank card data successfull save")
+		pkg, err = GetProtocolPackage[model.BankCardData](index)
 	case 2:
-		fd := model.FileData{}
-		err := survey.Ask(fileQuest, &fd)
-		if err != nil {
-			return err
-		}
-		desc, err := client.GetDataDescription()
-		if err != nil {
-			return err
-		}
-		data, err := os.ReadFile(fd.Filename)
-		if err != nil {
-			return err
-		}
-		pkg, err := protocol.CreateProtoPackage(data, model.FileType, *desc)
-		if err != nil {
-			return err
-		}
-
-		err = pkg.CryptPkgData(client.CryptKey)
-		if err != nil {
-			return err
-		}
-		err = client.SendData(pkg)
-		if err != nil {
-			return err
-		}
-		fmt.Println("user file successfull save")
-
+		pkg, err = GetProtocolPackage[model.FileData](index)
 	}
+	if err != nil {
+		return err
+	}
+	err = pkg.CryptPkgData(client.CryptKey)
+	if err != nil {
+		return err
+	}
+	err = client.SendData(pkg)
+	if err != nil {
+		return err
+	}
+	fmt.Println("data successfull save")
+
 	return nil
 }
 
-func (client *KeeperClient) GetDataDescription() (*string, error) {
-
+func GetDataDescription() (*string, error) {
 	var desc string
 	err := survey.Ask(descQuest, &desc)
 	if err != nil {

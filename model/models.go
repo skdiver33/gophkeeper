@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"os"
 	"time"
 )
 
@@ -32,7 +33,7 @@ type AuthData struct {
 	Password string `json:"password"`
 }
 
-func (ad *AuthData) ToBinary() ([]byte, error) {
+func (ad AuthData) ToBinary() ([]byte, error) {
 	return json.Marshal(ad)
 }
 
@@ -51,7 +52,7 @@ type BankCardData struct {
 	CardHolder string `json:"cardholder"`
 }
 
-func (bcd *BankCardData) ToBinary() ([]byte, error) {
+func (bcd BankCardData) ToBinary() ([]byte, error) {
 	return json.Marshal(bcd)
 }
 
@@ -65,4 +66,17 @@ func (bcd *BankCardData) FromBinary(input []byte) error {
 
 type FileData struct {
 	Filename string `json:"filename"`
+}
+
+func (file FileData) ToBinary() ([]byte, error) {
+	data, err := os.ReadFile(file.Filename)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (file *FileData) FromBinary(input []byte) error {
+
+	return nil
 }

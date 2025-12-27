@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -27,6 +28,10 @@ type KeeperClient struct {
 	UserData   *[]model.Metadata
 	CryptKey   []byte
 }
+
+var (
+	KeeperClientErrDataNotFound = errors.New("Data not found")
+)
 
 func NewKeeperClient() (*KeeperClient, error) {
 	conf, err := NewKeeperClientConfig()
@@ -94,31 +99,49 @@ func (client *KeeperClient) UserAuth(regData *model.User, url string) error {
 	return nil
 }
 
+func (client *KeeperClient) PrepareDataRequest(method string, msg any, endpoint string) (*http.Request, error) {
+	var data []byte
+
+	var body io.Reader
+	if msg != nil {
+		var requestBody bytes.Buffer
+		d, err := json.Marshal(msg)
+		if err != nil {
+			return nil, err
+		}
+		data = d
+		zw := gzip.NewWriter(&requestBody)
+		if _, err := zw.Write(data); err != nil {
+			return nil, fmt.Errorf("error compress data %w", err)
+		}
+		if err := zw.Close(); err != nil {
+			return nil, fmt.Errorf("error close zip writer. error: %w", err)
+		}
+		body = &requestBody
+	} else {
+		body = nil
+	}
+
+	req, err := http.NewRequest(method, client.Config.ServerAddr+endpoint, body)
+	if err != nil {
+		return nil, fmt.Errorf("error! create request. error: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+client.JWT)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+	}
+
+	return req, nil
+}
+
 func (client *KeeperClient) SendData(pkg *protocol.ProtocolPackage) error {
 
-	data, err := json.Marshal(pkg)
+	req, err := client.PrepareDataRequest(http.MethodPost, pkg, "/data")
 	if err != nil {
 		return err
 	}
-
-	var requestBody bytes.Buffer
-
-	zw := gzip.NewWriter(&requestBody)
-	if _, err := zw.Write(data); err != nil {
-		return fmt.Errorf("error compress data %w", err)
-	}
-	if err := zw.Close(); err != nil {
-		return fmt.Errorf("error close zip writer. error: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, client.Config.ServerAddr+"/data", &requestBody)
-	if err != nil {
-		return fmt.Errorf("error! create request. error: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+client.JWT)
-	req.Header.Set("Content-Encoding", "gzip")
-
 	response, err := client.NWClient.Do(req)
 
 	if err != nil {
@@ -135,12 +158,10 @@ func (client *KeeperClient) SendData(pkg *protocol.ProtocolPackage) error {
 
 func (client *KeeperClient) GetAllData() (*[]model.Metadata, error) {
 
-	req, err := http.NewRequest(http.MethodGet, client.Config.ServerAddr+"/alldata", nil)
+	req, err := client.PrepareDataRequest(http.MethodGet, nil, "/alldata")
 	if err != nil {
-		return nil, fmt.Errorf("error! create request. error: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+client.JWT)
 
 	response, err := client.NWClient.Do(req)
 
@@ -148,6 +169,10 @@ func (client *KeeperClient) GetAllData() (*[]model.Metadata, error) {
 		return nil, err
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusNoContent {
+		return nil, KeeperClientErrDataNotFound
+	}
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error get all data from server. Response code %d ", response.StatusCode)
@@ -165,19 +190,10 @@ func (client *KeeperClient) GetAllData() (*[]model.Metadata, error) {
 
 func (client *KeeperClient) GetData(md model.Metadata) (*protocol.ProtocolPackage, error) {
 
-	data, err := json.Marshal(md)
+	req, err := client.PrepareDataRequest(http.MethodGet, md, "/data")
 	if err != nil {
 		return nil, err
 	}
-	requestBody := bytes.NewBuffer(data)
-
-	req, err := http.NewRequest(http.MethodGet, client.Config.ServerAddr+"/data", requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("error! create request. error: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+client.JWT)
-
 	response, err := client.NWClient.Do(req)
 
 	if err != nil {
@@ -201,19 +217,10 @@ func (client *KeeperClient) GetData(md model.Metadata) (*protocol.ProtocolPackag
 
 func (client *KeeperClient) DeleteData(md model.Metadata) error {
 
-	data, err := json.Marshal(md)
+	req, err := client.PrepareDataRequest(http.MethodDelete, md, "/data")
 	if err != nil {
 		return err
 	}
-	requestBody := bytes.NewBuffer(data)
-
-	req, err := http.NewRequest(http.MethodDelete, client.Config.ServerAddr+"/data", requestBody)
-	if err != nil {
-		return fmt.Errorf("error! create request. error: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+client.JWT)
-
 	response, err := client.NWClient.Do(req)
 
 	if err != nil {
